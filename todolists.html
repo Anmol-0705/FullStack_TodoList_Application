@@ -1,0 +1,146 @@
+﻿<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no">
+    <title>FamilyAppBudget</title>
+    <link rel="stylesheet" href="assets/bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&amp;display=swap">
+    <link rel="stylesheet" href="assets/fonts/font-awesome.min.css">
+    <link rel="stylesheet" href="assets/css/Google-Style-Login.css">
+    <link rel="stylesheet" href="assets/css/styles.css">
+
+    <script src="assets/alertifyjs/alertify.min.js "></script>
+    <link rel="stylesheet" href="assets/alertifyjs/css/alertify.min.css" />
+    <link rel="stylesheet" href="assets/alertifyjs/css/themes/default.min.css" />
+
+    <script src="assets/js/angular.min.js"></script>
+    <script src="assets/js/angular-sanitize.min.js"></script>
+    <script>
+        var app = angular.module('myApp', []);
+        app.controller('customersCtrl', function ($scope, $http, $location) {
+
+            $scope.Email = $scope.PWD = null;
+            $scope.TodoLists = [];
+            $scope.Order = {};
+            $scope.SelectedTodoList = null;
+            $scope.ViewOrder = false;
+            $scope.NewList = false;
+            $scope.Task = "";
+
+            $scope.Load = function () {
+                $http.get("assets/api/GetSelfUser.php").then(function (response) {
+                    $scope.User = response.data.Values;
+                    if ($scope.User == "Error") location.assign("login.html");
+                    //$http.get("assets/api/GetFamilyMemberApi.php").then(function (response) { $scope.FamilyMembers = response.data.Values; });
+                    $scope.LoadLists();
+                });
+
+            }
+            $scope.Load();
+
+            $scope.LoadLists = function () {
+                $http.get("assets/api/GetTodoListsApi.php").then(function (response) {
+                    $scope.TodoLists = response.data.Values;
+                });
+
+            }
+
+            $scope.AddTaskToList = function () {
+
+                
+                var data = {
+                    TaskName: $scope.Task,
+                    TDLID: $scope.SelectedTodoList.TDLID,
+                    TaskStatus: "Pending",
+                    TID:0
+                };
+                data = JSON.parse(JSON.stringify(data));
+                console.log(data);
+                
+                $http.post("assets/api/SaveTasktApi.php",data).then(function (response) {
+                    $scope.SelectedTodoList.Tasks.push(data);
+                    $scope.Task = "";
+                });
+
+            }
+
+
+
+            $scope.SelectList = function (TodoList) {
+
+                $scope.SelectedTodoList = TodoList;
+
+            }
+            $scope.TaskDone = function (Task) {
+
+                $http.get("assets/api/TaskDoneApi.php?TID=" + Task.TID).then(function (response) {
+                    $scope.SelectedTodoList.TaskCompleted++;
+                    Task.TaskStatus = 'Completed';
+                    alertify.success("Task Completed");
+                });
+            }
+            $scope.BackToLists = function () { $scope.SelectedTodoList = null; }
+            $scope.Remove = function (SelectedTodoList) {
+                alertify.confirm("Confirm Delete", "Are you sure ?", function () {
+                    $http.get("assets/api/DeleteToDoList.php?TDLID=" + SelectedTodoList.TDLID).then(function (response) {
+                        $scope.TodoLists.splice($scope.TodoLists.indexOf(SelectedTodoList), 1);
+                        $scope.BackToLists();
+                        alertify.success("List Deleted");
+                    });
+                }, function () { });
+
+            }
+        });
+
+
+
+    </script>
+</head>
+
+<body ng-app="myApp" ng-controller="customersCtrl" id="Body" style="font-size: 14px;">
+    <div ng-include src="'menu.php'"></div>
+
+    <div class="container shadow-sm d-flex align-items-center" style="padding-top: 15px;">
+        <img src="assets/img/Clipboard list.png" style="margin-bottom: 10px;" />
+        <h4 class="text-left d-flex flex-fill">Todo Lists</h4>
+        <a class="btn btn-primary align-self-start" href="todolistupdate.html">+ Add</a>
+    </div>
+    <div class="container" style="margin-top: 15px;" ng-show="SelectedTodoList==null">
+        <ul class="list-group shadow-sm">
+            <li ng-repeat="TodoList in TodoLists" style="cursor:pointer;" ng-class="TodoList.TaskCompleted==TodoList.Tasks.length?'list-group-item-success':''" ng-click="SelectList(TodoList)" class="list-group-item"><h5>{{TodoList.ListName}} - [  {{TodoList.TaskCount}}  ]</h5><hr style="margin-bottom:5px;" /><small>{{TodoList.CreationDate}}</small></li>
+
+        </ul>
+    </div>
+
+    <div class="container" style="margin-top: 10px;" ng-show="SelectedTodoList!=null">
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex align-items-end">
+                    <button ng-click="BackToLists()" class="btn btn-primary" type="button"><i class="fa fa-arrow-left"></i></button>
+                    <h4>&nbsp; {{SelectedTodoList.ListName}}</h4>
+                </div>
+                <hr />
+                <div class="input-group border rounded">
+                    <input class="form-control" ng-model="Task" type="text" name="Task" placeholder="Add Task" style="padding: 16px;" required />
+                    <div class="input-group-append">
+                        <button class="btn btn-primary" ng-click="AddTaskToList()" type="button"><i class="fa fa-plus"></i></button>
+                    </div>
+                </div>
+
+                <h6 class="text-muted card-subtitle mb-2" style="margin-top: 9px;">Total tasks - {{SelectedTodoList.Tasks.length}}</h6>
+                <ul class="list-group">
+                    <li ng-repeat="Task in SelectedTodoList.Tasks" ng-class="(Task.TaskStatus=='Completed')?'list-group-item-success':''" class="list-group-item d-flex justify-content-start align-items-center">
+                        <span class="flex-fill">{{Task.TaskName}} </span>
+                        <button ng-show="Task.TaskStatus =='Pending'" class="btn btn-success btn-sm" ng-click="TaskDone(Task)" type="button" style="margin-right: -10px;"><i class="fa fa-check"></i></button>
+                    </li>
+                </ul><button class="btn btn-danger" ng-click="Remove(SelectedTodoList)" style="margin-top: 10px;">Delete</button>
+            </div>
+        </div>
+    </div>
+    <script src="assets/js/jquery.min.js"></script>
+    <script src="assets/bootstrap/js/bootstrap.min.js"></script>
+</body>
+
+</html>
